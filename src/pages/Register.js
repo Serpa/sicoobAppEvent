@@ -1,106 +1,142 @@
-import React, { useRef, useState } from 'react'
-import { ScrollView, StyleSheet, View } from 'react-native'
+import React, { useState } from 'react'
+import { Image, ScrollView, StyleSheet, View } from 'react-native'
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { Avatar, Button, Input } from '@rneui/themed';
-
+import * as ImagePicker from 'expo-image-picker';
+import AuthService from '../../AuthService';
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getFirestore, collection, addDoc, setDoc, getDocs, doc } from "firebase/firestore";
+import { getAuth, updateProfile } from "firebase/auth";
+const storage = getStorage();
+const db = getFirestore();
 
 export default function Register() {
-    const input = useRef([]);
-    const [name, setName] = useState({ value: '', error: false });
-    const [email, setEmail] = useState({ value: '', error: false });
-    const [password, setPassword] = useState({ value: '', error: false });
-    const [password2, setPassword2] = useState({ value: '', error: false });
-    const [phone, setPhone] = useState({ value: '', error: false });
-    const [photo, setPhoto] = useState(null);
+    const [errors, setErrors] = useState({});
+    const [name, setName] = useState();
+    const [email, setEmail] = useState();
+    const [password, setPassword] = useState();
+    const [password2, setPassword2] = useState();
+    const [phone, setPhone] = useState();
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [error, setError] = useState(false);
+    const [loading, setLoading] = useState(false)
+
+    const handleRegister = async () => {
+        setLoading(true);
+        try {
+            const user = await AuthService.register(email, password)
+            const blob = await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.onload = function () {
+                    resolve(xhr.response);
+                };
+                xhr.onerror = function (e) {
+                    console.log(e);
+                    reject(new TypeError("Network request failed"));
+                };
+                xhr.responseType = "blob";
+                xhr.open("GET", selectedImage, true);
+                xhr.send(null);
+            });
+
+            const fileRef = ref(storage, `avatars/${user.uid}.jpg`);
+            const result = await uploadBytes(fileRef, blob);
+            blob.close();
+            const photo_url = await getDownloadURL(fileRef);
+            await updateProfile(user, {
+                displayName: name,
+                photoURL: photo_url,
+            });
+            await setDoc(doc(db, "users", user.uid), {
+                name: name,
+                phoneNumber: phone,
+                photoURL: photo_url,
+            }, { capital: true }, { merge: true });
+            setLoading(false)
+        } catch (e) {
+            console.warn(e);
+            setError(e.message)
+            setLoading(false);
+        }
+    }
+
+
+    const handleImagePicker = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (status !== 'granted') {
+            alert('Permission to access media library is required!');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 1,
+        });
+
+        if (!result.canceled) {
+            setSelectedImage(result.assets[0].uri);
+        }
+    };
+
+
     return (
         <ScrollView >
             <View style={style.container}>
                 <Avatar
                     size={250}
                     rounded
-                    source={{ uri: 'https://randomuser.me/api/portraits/women/57.jpg' }}
+                    source={{ uri: selectedImage }}
                     title="Avatar"
                     containerStyle={{ backgroundColor: 'grey' }}
                 >
-                    <Avatar.Accessory size={50} />
+                    <Avatar.Accessory size={50} onPress={handleImagePicker} />
                 </Avatar>
                 <Input
-                    ref = {ref => input.current.name = ref}
-                    containerStyle={{}}
                     disabledInputStyle={{ background: "#ddd" }}
-                    inputContainerStyle={{}}
-                    errorMessage={name.error ? 'Insira um nome válido' : false}
-                    errorStyle={{}}
-                    errorProps={{}}
-                    inputStyle={{}}
-                    labelStyle={{}}
-                    labelProps={{}}
+                    errorMessage={errors.name ? 'Insira um nome válido' : ''}
                     leftIcon={<Icon name="account-outline" size={20} />}
-                    leftIconContainerStyle={{}}
-                    rightIcon={<Icon name="close" size={20} onPress={() => input.current.name.clear()} />}
-                    rightIconContainerStyle={{}}
                     placeholder="Digite o seu nome"
                     value={name}
                     onChangeText={(text) => setName(text)}
                 />
                 <Input
-                    ref = {ref => input.current.email = ref}
-                    containerStyle={{}}
                     disabledInputStyle={{ background: "#ddd" }}
-                    inputContainerStyle={{}}
-                    errorMessage={email.error ? 'Insira um email válido' : false}
+                    errorMessage={errors.phone ? 'Insira um celular válido' : ''}
+                    leftIcon={<Icon name="cellphone" size={20} />}
+                    placeholder="Digite seu celular"
+                    value={phone}
+                    onChangeText={(text) => setPhone(text)}
+                />
+                <Input
+                    disabledInputStyle={{ background: "#ddd" }}
+                    errorMessage={errors.email ? 'Insira um email válido' : ''}
                     leftIcon={<Icon name="email" size={20} />}
-                    leftIconContainerStyle={{}}
-                    rightIcon={<Icon name="close" size={20} onPress={() => input.current.email.clear()} />}
-                    rightIconContainerStyle={{}}
                     placeholder="Digite o seu e-mail"
                     value={email}
+                    autoCapitalize="none"
                     onChangeText={(text) => setEmail(text)}
                 />
                 <Input
-                    ref = {ref => input.current.password = ref}
-                    containerStyle={{}}
                     disabledInputStyle={{ background: "#ddd" }}
-                    inputContainerStyle={{}}
-                    errorMessage={password.error ? 'Insira uma senha valida' : false}
+                    errorMessage={errors.password ? 'Insira uma senha valida' : ''}
                     leftIcon={<Icon name="form-textbox-password" size={20} />}
-                    leftIconContainerStyle={{}}
-                    rightIcon={<Icon name="close" size={20} onPress={() => input.current.password.clear()} />}
-                    rightIconContainerStyle={{}}
                     placeholder="Digite a sua senha"
                     value={password}
                     onChangeText={(text) => setPassword(text)}
                     secureTextEntry={true}
                 />
                 <Input
-                    ref = {ref => input.current.password2 = ref}
-                    containerStyle={{}}
                     disabledInputStyle={{ background: "#ddd" }}
-                    inputContainerStyle={{}}
-                    errorMessage={password2.error ? 'A senha não confere' : false}
+                    errorMessage={errors.password2 ? 'A senha não confere' : ''}
                     leftIcon={<Icon name="form-textbox-password" size={20} />}
-                    leftIconContainerStyle={{}}
-                    rightIcon={<Icon name="close" size={20} onPress={() => input.current.password2.clear()} />}
-                    rightIconContainerStyle={{}}
                     placeholder="Confirme sua senha"
                     secureTextEntry={true}
                     value={password2}
                     onChangeText={(text) => setPassword2(text)}
                 />
-                <Input
-                    ref = {ref => input.current.phone = ref}
-                    containerStyle={{}}
-                    disabledInputStyle={{ background: "#ddd" }}
-                    inputContainerStyle={{}}
-                    errorMessage={phone.error ? 'Insira um celular válido' : false}
-                    leftIcon={<Icon name="cellphone" size={20} />}
-                    leftIconContainerStyle={{}}
-                    rightIcon={<Icon name="close" size={20} onPress={() => input.current.phone.clear()} />}
-                    rightIconContainerStyle={{}}
-                    placeholder="Digite seu celular"
-                    value={phone}
-                    onChangeText={(text) => setPhone(text)}
-                />
+
                 <Button
                     title="Cadastrar"
                     titleStyle={{ fontWeight: '700' }}
@@ -116,6 +152,7 @@ export default function Register() {
                         marginHorizontal: 50,
                         marginVertical: 10,
                     }}
+                    onPress={handleRegister}
                 />
             </View>
         </ScrollView>

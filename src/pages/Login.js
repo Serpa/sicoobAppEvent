@@ -1,8 +1,31 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import { Button, Input, Image } from '@rneui/themed';
+import AuthService from "../../AuthService";
+import { useAuthentication } from '../utils/hooks/useAuthentication';
 
 export default function Login({ navigation }) {
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState(false);
+    const [loading, setLoading] = useState(false)
+
+    const handleLogin = async () => {
+        setLoading(true);
+        try {
+            const user = await AuthService.signIn(email, password)
+            setLoading(false)
+        } catch (e) {
+            setError(e.message)
+            setLoading(false);
+        }
+    }
+
+    const teste = () => {
+        console.warn(useAuthentication);
+    }
+
+
     return (
         <>
             <View style={style.logo}>
@@ -11,8 +34,11 @@ export default function Login({ navigation }) {
             <View style={style.container}>
                 <Input
                     placeholder='E-mail'
+                    value={email}
+                    onChangeText={text => setEmail(text)}
                 />
-                <Input placeholder="Senha" secureTextEntry={true} />
+                <Input placeholder="Senha" secureTextEntry={true} value={password}
+                    onChangeText={text => setPassword(text)} />
                 <View style={style.buttons}>
                     <Button
                         title="Entrar"
@@ -29,7 +55,7 @@ export default function Login({ navigation }) {
                             marginHorizontal: 50,
                             marginVertical: 10,
                         }}
-                        onPress={() => navigation.navigate("Camera")}
+                        onPress={handleLogin}
                     />
                     <Button
                         title="Cadastro"
